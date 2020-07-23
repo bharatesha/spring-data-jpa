@@ -1,0 +1,1 @@
+insert into fin_doc_file (id, title, xml_file) values (1L, 'title', 'xml file')

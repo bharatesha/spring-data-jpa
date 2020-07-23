@@ -1,3 +1,15 @@
+
+Spring TDD steps:
+1. Setup Gradle - testCompile 'external:h2:1+' (external is for ivy), testCompile("org.springframework.boot:spring-boot-starter-test:1.5.9.RELEASE") along spring-boot-starter, spring-boot-starter-data-jpa
+2. Create TestCase class file, example: DocFileRepositoryTest.java - @RunWith(SpringRunner.class) @DataJpaTest
+3. Start with test (Given -> When -> Then)
+4. @Entity(name="student")Mandatory entity name defaults to the name of the class. @Table(name="") - optional, the name of the table in the database and the name of the entity will not be the same. @Id - The value can be AUTO, TABLE, SEQUENCE, or IDENTITY.
+5. Create entity class - @NoArgsConstructor @AllArgsConstructor(staticName = "of") @Getter(read-only) @Entity @builder(write)
+6. Create repository - CrudRepository
+7. JpaRepository extends PagingAndSortingRepository which in turn extends CrudRepository. JpaRepository provides some JPA-related methods such as flushing the persistence context and deleting records in a batch.
+8. Run test cases
+
+
 Spring Data
 
      Domain Design Pattern , Domain-Driven Design application,
@@ -238,13 +250,5 @@ Spring Testing
   --Spring DBUnit - DbUnit is a JUnit extension (also usable with Ant) targeted at database-driven projects.
 
 
-Spring TDD steps (myself):
-1. Setup Gradle - testCompile 'external:h2:1+' (external is for ivy), testCompile("org.springframework.boot:spring-boot-starter-test:1.5.9.RELEASE") along spring-boot-starter, spring-boot-starter-data-jpa
-2. Create TestCase class file, example: DocFileRepositoryTest.java - @RunWith(SpringRunner.class) @DataJpaTest
-3. Start with test (Given -> When -> Then)
-4. @Entity(name="student")Mandatory entity name defaults to the name of the class. @Table(name="") - optional, the name of the table in the database and the name of the entity will not be the same. @Id - The value can be AUTO, TABLE, SEQUENCE, or IDENTITY.
-5. Create entity class - @NoArgsConstructor @AllArgsConstructor(staticName = "of") @Getter(read-only) @Entity @builder(write)
-6. Create repository - CrudRepository
-7. JpaRepository extends PagingAndSortingRepository which in turn extends CrudRepository. JpaRepository provides some JPA-related methods such as flushing the persistence context and deleting records in a batch.
-8. Run test cases
+
 
