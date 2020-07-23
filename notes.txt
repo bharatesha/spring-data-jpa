@@ -1,0 +1,250 @@
+Spring Data
+
+     Domain Design Pattern , Domain-Driven Design application,
+	 --https://spring.io/projects/spring-data#overview
+
+     a. Spring Data Commons
+	    --Try to stick to immutable objects with Provide an all-args constructor
+		--Use Lombok to avoid boilerplate code
+		--For identifiers to be generated use - with
+		--Define Repository - Repository, CrudRepository, PagingAndSortingRepository, @EnableJpaRepositories, @NoRepositoryBean(only selected funcs)
+		--Query Creation - Ex: findDistinctPeopleByLastnameOrFirstname, findByLastnameOrderByFirstnameAsc, queryFirst10ByLastname,  Streamable<Person> findByFirstnameContaining(String firstname).
+           		Property Expressions: query nested properties - findByAddressZipCode. @NotNull, @Nullable, @Query with Stream. @Async with Future, CompletableFuture, ListenableFuture. Customizing with implements
+		--Web support with Rest @PathVariable, paging, sorting etc.  ExampleMatcher with Example<S>.
+        --Auditing - @CreatedBy, @CreatedDate, implements AuditorAware<User>
+
+	 b. Spring Data JDBC
+	    --https://docs.spring.io/spring-data/jdbc/docs/2.0.1.RELEASE/reference/html/#reference
+	    --aims to be much simpler conceptually, No lazy loading or caching is done, no dirty tracking and no session, simple model of how to map entities to tables. @EnableJdbcRepositories
+		--Custom converters - custom converters to influence how values are mapped in the database - @ReadingConverter, @WritingConverter. @MappedCollection(idColumn = "CUSTOM_COLUMN_NAME", keyColumn = "CUSTOM_KEY_COLUMN_NAME").  @Embedded(onEmpty = USE_NULL).@Table("CUSTOM_TABLE_NAME"),  @Column("CUSTOM_COLUMN_NAME").
+		--Using @Query - query lookup using property file. @Query("SELECT * FROM person WHERE lastname = :lastname"). @Modifying. Optional<T>
+		--Lifecycle Events -BeforeSaveEvent . . etc. EntityCallback - onBeforeSave
+		--Transactionality - @Transactional(timeout = 10), support at service level. support transactions on a method which involves many calls to db. @Transactional(readOnly = true). Auditing
+
+	 c. Spring Data JPA
+	    --https://docs.spring.io/spring-data/jpa/docs/current/reference/html/#reference
+		--@Entity @Table(name = "FIN.REPORT") @Repository
+		--CrudRepository interface
+
+		   public interface CrudRepository<T, ID> extends Repository<T, ID> {
+
+			  <S extends T> S save(S entity);
+
+			  Optional<T> findById(ID primaryKey);
+
+			  Iterable<T> findAll();
+
+			  long count();
+
+			  void delete(T entity);
+
+			  boolean existsById(ID primaryKey);
+
+			  // … more functionality omitted.
+			}
+			PagingAndSortingRepository
+			  -- Iterable<T> findAll(Sort sort);
+			  --Page<T> findAll(Pageable pageable);
+
+		--Query methods
+              Steps to use spring jpa
+                1. Declare an interface extending Repository with ID type(long) - interface PersonRepository extends Repository<Person, Long> { … }
+				2. Declare query methods on the interface. -  List<Person> findByLastname(String lastname);
+				3. @EnableJpaRepositories
+				4. Inject the repository instance and use it
+
+	    --Selectively exposing CRUD methods - @NoRepositoryBean
+		--query-lookup-strategy CREATE ,USE_DECLARED_QUERY , CREATE_IF_NOT_FOUND
+		--Query creation from method names - findDistinctPeopleByLastnameOrFirstname(String lastname, String firstname);, findByLastnameIgnoreCase(String lastname);, findByLastnameOrderByFirstnameAsc(String lastname);
+		-- Traversing nested properties - List<Person> findByAddress_ZipCode(ZipCode zipCode);
+		--Special parameter handling - List<User> findByLastname(String lastname, Sort sort);, Pageable
+		--Limiting Query Results- queryFirst10ByLastname, findTopByOrderByAgeDesc
+		--Using Streamable as Query Method Return Type, Streamable can be used as alternative to Iterable or any collection type. It provides convenience methods to access a non-parallel Stream (missing from Iterable), the ability to directly ….filter(…) and ….map(…) over the elements and concatenate the Streamable to others:
+        		- Streamable<Person> findByFirstnameContaining(String firstname);, Streamable<Person> result = repository.findByFirstnameContaining("av").and(repository.findByLastnameContaining("ea"));
+		--Custom Streamable Wrapper Types - @RequiredArgConstructor(staticName = "of") class Products implements Streamable<Product>
+		--Nullability Annotations -- @NonNullApi: Used on the package level to declare .@NonNull / @Nullable Used on a parameter or return value. @org.springframework.lang.NonNullApi package com.acme;
+		   @Nullable
+ 		   User findByEmailAddress(@Nullable EmailAddress emailAdress);
+        -- Streaming query results - @Query("select u from User u")Stream<User> findAllByCustomQueryAndStream();
+		  -A Stream potentially wraps underlying data store-specific resources and must, therefore, be closed after usage.try-with-resources.
+		  -try (Stream<User> stream = repository.findAllByCustomQueryAndStream()) {
+        -- Async query results - method returns immediately upon invocation while the actual query execution occurs in a task
+            -@Async
+             CompletableFuture<User> findOneByFirstname(String firstname);
+	    --Customizing Individual Repositories
+		--Querydsl Extension - public interface QuerydslPredicateExecutor<T> { Optional<T> findById(Predicate predicate); }
+		--Web support  - the method receives a User instance directly, and no further lookup is necessary
+		    @RequestMapping("/{id}")
+			  String showUserForm(@PathVariable("id") User user, Model model) {
+
+				model.addAttribute("user", user);
+				return "userForm";
+			  }
+		  -Pageable and Sort - Refer section
+        -- Sample configuration
+            @Configuration
+			@EnableJpaRepositories
+			@EnableTransactionManagement
+			class ApplicationConfig {
+
+			  @Bean
+			  public DataSource dataSource() {
+
+				EmbeddedDatabaseBuilder builder = new EmbeddedDatabaseBuilder();
+				return builder.setType(EmbeddedDatabaseType.HSQL).build();
+			  }
+
+			  @Bean
+			  public LocalContainerEntityManagerFactoryBean entityManagerFactory() {
+
+				HibernateJpaVendorAdapter vendorAdapter = new HibernateJpaVendorAdapter();
+				vendorAdapter.setGenerateDdl(true);
+
+				LocalContainerEntityManagerFactoryBean factory = new LocalContainerEntityManagerFactoryBean();
+				factory.setJpaVendorAdapter(vendorAdapter);
+				factory.setPackagesToScan("com.acme.domain");
+				factory.setDataSource(dataSource());
+				return factory;
+			  }
+
+			  @Bean
+			  public PlatformTransactionManager transactionManager(EntityManagerFactory entityManagerFactory) {
+
+				JpaTransactionManager txManager = new JpaTransactionManager();
+				txManager.setEntityManagerFactory(entityManagerFactory);
+				return txManager;
+			  }
+			}
+           --You must create LocalContainerEntityManagerFactoryBean and not EntityManagerFactory directly, since the former also participates in exception translation mechanisms in addition to creating EntityManagerFactory.
+		--Bootstrap Mode - By default, Spring Data JPA repositories are default Spring beans. They are singleton scoped and eagerly initialized. DEFAULT (eager), LAZY, DEFERRED (repository initialization in response to an ContextRefreshedEvent)
+		--@Transient - Transient so that it’s not persisted to the database.  @PrePersist  @PostLoad  void markNotNew() {    this.isNew = false;  }
+        -- Query Lookup Strategies - Refer section.
+           -QueryByMethodName
+   		   -nativeQuery
+ 		   -Advanced LIKE (@Query("select u from User u where u.firstname like %?1"))
+		   -Sort(repo.findByAndSort("lannister", new Sort("firstname"));)
+		   -Using Named Parameters - @Query("select u from User u where u.firstname = :firstname or u.lastname = :lastname")
+									User findByLastnameOrFirstname(@Param("lastname") String lastname,
+									@Param("firstname") String firstname);
+	       -SpEL -  @Query("select t from #{#entityName} t where t.attribute = ?1") List<T> findAllByAttribute(String attribute);
+		      -@Query("select u from User u where u.firstname = ?1 and u.firstname=?#{[0]} and u.emailAddress = ?#{principal.emailAddress}")
+			   List<User> findByFirstnameAndCurrentUserWithCustomQuery(String firstname);
+		--@Modifying - like delete, save
+        --Query Hints - can be ignored. omit applying it to the count query triggered
+		--Configuring Fetch- and LoadGraphs
+		--Projections - retrieve the person’s name attributes only and ignore address attribute. Interface-based Projections, Class-based Projections, Dynamic Projections(<T> Collection<T> findByLastname(String lastname, Class<T> type);)
+		--Stored Procedures-
+		    -StoredProcedure metadata definitions on an entity.
+    			 @Entity
+				@NamedStoredProcedureQuery(name = "User.plus1", procedureName = "plus1inout", parameters = {
+				  @StoredProcedureParameter(mode = ParameterMode.IN, name = "arg", type = Integer.class),
+				  @StoredProcedureParameter(mode = ParameterMode.OUT, name = "res", type = Integer.class) })
+				public class User {}
+			-@Procedure("plus1inout")
+             Integer explicitlyNamedPlus1inout(Integer arg);
+	    --Specifications - Refer doc. public static Specification<Customer> isLongTermCustomer() {}, List<Customer> customers = customerRepository.findAll(isLongTermCustomer());  Specification implements toPredicate
+		--Query by Example - Example: An Example consists of the probe( Domain object - Person) and the ExampleMatcher. It is used to create the query.
+		                Person person = new Person();
+      					person.setFirstname("Dave");
+						Example<Person> example = Example.of(person);
+
+						ExampleMatcher matcher = ExampleMatcher.matching()
+						  .withIgnorePaths("lastname")
+						  .withIncludeNullValues()
+						  .withStringMatcherEnding();
+						Example<Person> example = Example.of(person, matcher);
+
+                         Executing an example - personRepository.findAll(Example.of(probe));
+
+
+
+		--Transactionality
+		-https://dzone.com/articles/how-does-spring-transactional
+		   --By default, CRUD methods on repository instances are transactional.
+		   -- @Transactional(timeout = 10)
+		   -Using a facade to define transactions for multiple repository calls (@Transactional at method level), @EnableTransactionManagement explicitly to get annotation-based configuration of facades to work. This example assumes you use component scanning.
+		   -Transactional query methods (@Transactional(readOnly = true)public interface UserRepository extends JpaRepository<User, Long> {).Typically, you want the readOnly flag to be set to true, as most of the query methods only read data. In contrast to that, deleteInactiveUsers() makes use of the @Modifying annotation and overrides the transaction configuration. Thus, the method runs with the readOnly flag set to false.
+		   -You can use transactions for read-only queries and mark them as such by setting the readOnly flag. Doing so does not, however, act as a check that you do not trigger a manipulating query (although some databases reject INSERT and UPDATE statements inside a read-only transaction). The readOnly flag is instead propagated as a hint to the underlying JDBC driver for performance optimizations. Furthermore, Spring performs some optimizations on the underlying JPA provider. For example, when used with Hibernate, the flush mode is set to NEVER when you configure a transaction as readOnly, which causes Hibernate to skip dirty checks (a noticeable improvement on large object trees).
+
+		--Locking
+		    --https://www.logicbig.com/tutorials/spring-framework/spring-data/pessimistic-locking-and-lock-annotation.html
+			   https://stackoverflow.com/questions/35523428/spring-jpa-lock
+		    - Optimistic Locking (last tutorial) is enabled by default given that @Version annotation is used in entities
+		   @Lock(LockModeType.READ);
+           List<User> findAll();
+
+		   - Optimistic Locking - the transaction doesn't lock the entity immediately.@Lock(LockModeType.OPTIMISTIC_FORCE_INCREMENT).
+            optimistic should be used when less write operation are planned. read operation will not lock an object.
+			For example: You have an "money balance" float in an entity with an optimistic lock. Now two processes read this value and use it for calculating and stuff. One of them now changes the value and writes it to the database with an update. No error to this point.
+			But now the other process also changes the value and wants to update it. Now there is an error. This only happened because of the second update.
+			If the second process would have deleted the instance, nothing would have happend.
+
+		   - Pessimistic Locking -  in a transaction and access an entity, it will be locked immediately. @Lock(LockModeType.PESSIMISTIC_READ).
+    		  pessimistic should be used when much write operation are planned. read operation will lock an object.
+	    		For example: You have an "money balance" float in an entity with an pessimistic lock. One process reads the data/value with "findOne".
+		    	After this, an other process wants to read the data as well, what would be possible with an optimistic lock, but with the pessimistic lock he must now wait (no error, just wait).
+			  When process 1 is ready (changing the value and updating it), process 2 can go on.
+
+		   -force increment- updates the object's version. Throws an exception for non-versioned objects.
+
+
+		--Auditing - provide @CreatedBy and @LastModifiedBy to capture the user who created or modified the entity as well as @CreatedDate and @LastModifiedDate to capture when the change happened.
+		             class SpringSecurityAuditorAware implements AuditorAware<User> {
+		--Miscelan
+		   - @Inject vs @Autowired - Assuming here you're referring to the javax.inject.Inject annotation. @Inject is part of the Java CDI (Contexts and Dependency Injection) standard introduced in Java EE 6 (JSR-299), read more. Spring has chosen to support using the @Inject annotation synonymously with their own @Autowired annotation.
+		   - JPA's EntityManager should be RequestScoped? - https://stackoverflow.com/questions/19431423/getting-a-reference-to-entitymanager-in-java-ee-applications-using-cdi
+		   -@Produces - specify the MIME media types or representations a resource can produce and send back to the client. https://docs.oracle.com/cd/E19776-01/820-4867/ghrns/index.html
+
+
+	 d. Spring Data KeyValue
+	       -https://docs.spring.io/spring-data/data-keyvalue/riak/docs/current/reference/html/
+		   -Key Value stores represent one of the largest (and oldest) member in the NoSQL space.
+		   -In terms of key value stores, Redis 2.0.x and Riak 0.13 are required.
+
+	 e. etc other modules like apache modules, Neo4j, DynamoDb, Google Datastore
+
+	 Spring Data vs Hibernate vs QueryDSL
+
+	         Spring Data JPA is not a JPA provider. It is a library/framework that adds an extra layer of abstraction on the top of our JPA provider (like Hibernate).
+
+			 Spring Data JPA -  generate JPA queries on your behalf through method name conventions.
+
+				 Spring Data JPA is Spring abstraction to JPA (Java Persistence API) with more easy to use methods alongwith the defaults defined in JPA Specification
+			Hibernate on the other case is a JPA Implementation (JPA provider).
+			Spring Data cannot exist by itself and needs one or the other JPA Provider for implementation of the methods. For this reason, Spring Data JPA can work with any JPA provider but comes auto-configured with Hibernate by default.
+
+			So, all ORM features in Spring-data under the hood for entity management and query submission etc are still using Hibernate implementations. Repositories just allow you to write queries on the fly which again are converted to base queries based on the datasource provider and default hibernate SQL Dialect.
+
+			You can also use Spring-Data with other JPA Providers like (Toplink, OpenJPA, Eclipselink) with configuration in the project.
+
+	 Things to revisit - Transactions, RequestScopedTransactions
+
+
+
+
+
+Spring Testing
+   https://docs.spring.io/spring-framework/docs/current/spring-framework-reference/testing.html#testing-introduction
+  --Unit Testing
+      -Mock Objects - Environment, JNDI, Servlet API, Spring Web Reactive
+      -Unit Testing Support Classes
+	     -General Testing Utilities (org.springframework.test.util) - ReflectionTestUtils,AopTestUtils
+		 -Spring MVC Testing Utilities (org.springframework.test.web) - To unit test your Spring MVC Controller classes as POJOs, use ModelAndViewAssert combined with MockHttpServletRequest, MockHttpSession, and so on from Spring’s Servlet API mocks. For thorough integration testing of your Spring MVC and REST Controller classes in conjunction with your WebApplicationContext configuration for Spring MVC, use the Spring MVC Test Framework instead.
+  --Integration Testing
+      -Goals  - Spring IoC container caching,  Dependency Injection of test fixture instances., transaction management, Spring-specific base classes
+
+
+  --@DataJpaTest - provides some standard setup needed for testing the persistence layer: configuring H2(add h2 dependency), setting Hibernate, Spring Data, and the DataSource, performing an @EntityScan, turning on SQL logging
+  --Spring DBUnit - DbUnit is a JUnit extension (also usable with Ant) targeted at database-driven projects.
+
+
+Spring TDD steps (myself):
+1. Setup Gradle - testCompile 'external:h2:1+' (external is for ivy), testCompile("org.springframework.boot:spring-boot-starter-test:1.5.9.RELEASE") along spring-boot-starter, spring-boot-starter-data-jpa
+2. Create TestCase class file, example: DocFileRepositoryTest.java - @RunWith(SpringRunner.class) @DataJpaTest
+3. Start with test (Given -> When -> Then)
+4. @Entity(name="student")Mandatory entity name defaults to the name of the class. @Table(name="") - optional, the name of the table in the database and the name of the entity will not be the same. @Id - The value can be AUTO, TABLE, SEQUENCE, or IDENTITY.
+5. Create entity class - @NoArgsConstructor @AllArgsConstructor(staticName = "of") @Getter(read-only) @Entity @builder(write)
+6. Create repository - CrudRepository
+7. JpaRepository extends PagingAndSortingRepository which in turn extends CrudRepository. JpaRepository provides some JPA-related methods such as flushing the persistence context and deleting records in a batch.
+8. Run test cases
+

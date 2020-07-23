@@ -1,0 +1,37 @@
+group = 'helsinki'
+apply plugin: 'java'
+
+sourceCompatibility = 1.8
+
+def springBootVersion="1.5.9.RELEASE"
+
+repositories {
+    maven {
+        url "https://plugins.gradle.org/m2/"
+    }
+}
+
+dependencies {
+
+    //spring
+    implementation(group: 'org.springframework.boot', name: 'spring-boot-starter', version: '$springBootVersion') {
+        exclude group: 'org.springframework.boot', module: 'spring-boot-starter-logging'
+    }
+    implementation("org.springframework.boot:spring-boot-starter-data-jpa:$springBootVersion")
+
+    implementation 'com.h2database:h2:1+'
+
+    //lombok
+    compileOnly 'org.projectlombok:lombok:1+'
+    annotationProcessor 'org.projectlombok:lombok:1+'
+
+    //Tests
+    testImplementation("org.springframework.boot:spring-boot-starter-test:$springBootVersion")
+    testImplementation 'org.projectlombok:lombok:1+'
+    testImplementation 'com.h2database:h2:1+'
+    testCompile('javax.xml.bind:jaxb-api:1+')
+
+
+}
+
+

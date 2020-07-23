@@ -1,0 +1,10 @@
+.idea
+.gradle
+gradle
+gradlew
+gradlew
+build
+*.db
+out
+*.iml
+logs

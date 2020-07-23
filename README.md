@@ -1,3 +1,2 @@
 # spring-data-jpa
-
-Testing push
+Sample spring data example 
